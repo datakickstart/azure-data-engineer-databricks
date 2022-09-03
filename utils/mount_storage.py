@@ -11,7 +11,6 @@ def adls_authenticate():
   directory_id = "9fb75466-59fe-466b-bebb-b5805c51aaba"
   client_id = dbutils.secrets.get(secret_scope_name, 'service-principle-id')
 #   app_id = dbutils.secrets.get(secret_scope_name, '')
- 
   credential = dbutils.secrets.get(secret_scope_name, 'service-principle-pwd')
   
   spark.conf.set("fs.azure.account.auth.type", "OAuth")
