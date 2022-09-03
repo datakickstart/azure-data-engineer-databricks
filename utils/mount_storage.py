@@ -7,11 +7,12 @@ def adls_authenticate():
     - Key values are added to the secret scope so that references from dbutils.secrets.get work properly
   """
   secret_scope_name = "demo"
-  account_name = "dvtrainingadls"
-  client_id = dbutils.secrets.get(secret_scope_name, 'dvtrainingadls-client-id')
-  app_id = dbutils.secrets.get(secret_scope_name, 'dvtrainingadls-app-id')
-  directory_id = dbutils.secrets.get(secret_scope_name, 'dvtrainingadls-directory-id')
-  credential = dbutils.secrets.get(secret_scope_name, 'dvtrainingadls-credential')
+  account_name = "dlpssa4dev04"
+  directory_id = "9fb75466-59fe-466b-bebb-b5805c51aaba"
+  client_id = dbutils.secrets.get(secret_scope_name, 'service-principle-id')
+#   app_id = dbutils.secrets.get(secret_scope_name, '')
+ 
+  credential = dbutils.secrets.get(secret_scope_name, 'service-principle-pwd')
   
   spark.conf.set("fs.azure.account.auth.type", "OAuth")
   spark.conf.set("fs.azure.account.oauth.provider.type", "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
