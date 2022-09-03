@@ -1,14 +1,31 @@
 # Databricks notebook source
-# MAGIC %sh du -h -s /dbfs/mnt/datalake/raw/cu/*
-
-# COMMAND ----------
-
 # MAGIC %run ../utils/mount_storage
 
 # COMMAND ----------
 
 adls_authenticate()
 raw_storage_base_path = dbutils.secrets.get("demo", "raw-datalake-path")
+raw_format = "delta"
+
+
+# COMMAND ----------
+
+# Mount directory to use file system commands easily
+try:
+    adls_mount()
+except Exception as e:
+    if 'Directory already mounted' in str(e):
+        print("Already mounted")
+    else:
+        raise e
+
+# COMMAND ----------
+
+# MAGIC %sh du -h -s /dbfs/mnt/datalake/raw/cu/*
+
+# COMMAND ----------
+
+# MAGIC %fs ls /mnt/datalake/raw/cu/area
 
 # COMMAND ----------
 
@@ -21,7 +38,7 @@ raw_storage_base_path = dbutils.secrets.get("demo", "raw-datalake-path")
 # COMMAND ----------
 
 # Evaluate and explore area
-area_df = spark.read.parquet(raw_storage_base_path + "cu/area")
+area_df = spark.read.format(raw_format).load(raw_storage_base_path + "cu/area")
 display(area_df)
 
 
@@ -40,7 +57,7 @@ display(area_df)
 # COMMAND ----------
 
 # Evaluate and explore area
-series_df = spark.read.parquet(raw_storage_base_path + "cu/series")
+series_df = spark.read.format(raw_format).load(raw_storage_base_path + "cu/series")
 display(series_df)
 
 
@@ -55,7 +72,7 @@ display(series_df)
 # COMMAND ----------
 
 # Evaluate and explore area
-item_df = spark.read.parquet(raw_storage_base_path + "cu/item")
+item_df = spark.read.format(raw_format).load(raw_storage_base_path + "cu/item")
 display(item_df)
 
 
@@ -69,7 +86,7 @@ display(item_df)
 # COMMAND ----------
 
 # Evaluate and explore area
-base_df = spark.read.parquet(raw_storage_base_path + "cu/base")
+base_df = spark.read.format(raw_format).load(raw_storage_base_path + "cu/base")
 display(base_df)
 
 # COMMAND ----------
@@ -84,25 +101,5 @@ display(base_df)
 # COMMAND ----------
 
 # Evaluate and explore area
-current_df = spark.read.parquet(raw_storage_base_path + "cu/current")
+current_df = spark.read.format(raw_format).load(raw_storage_base_path + "cu/current")
 display(current_df)
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC CREATE OR REPLACE VIEW raw_cu.vw_current_full
-# MAGIC AS
-# MAGIC SELECT
-# MAGIC     c.year,
-# MAGIC     c.period,
-# MAGIC     s.*, 
-# MAGIC     item.item_name,
-# MAGIC     area.area_name,
-# MAGIC     c.value
-# MAGIC FROM `current` c
-# MAGIC   JOIN series s
-# MAGIC     ON c.series_id = s.series_id
-# MAGIC   JOIN item
-# MAGIC     ON s.item_code = item.item_code
-# MAGIC   JOIN area
-# MAGIC     ON s.area_code = area.area_code
