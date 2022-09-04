@@ -51,7 +51,7 @@ display(area_df)
 # MAGIC 3. base_period text not consistent
 # MAGIC 4. Columns in series_title text
 # MAGIC 5. footnote_codes (double): all NaN
-# MAGIC 6. being_year (bigint): min = 1913, max = 2020
+# MAGIC 6. begin_year (bigint): min = 1913, max = 2020
 # MAGIC 7. end_year (bigint): min = 1986, max = 2022
 
 # COMMAND ----------
