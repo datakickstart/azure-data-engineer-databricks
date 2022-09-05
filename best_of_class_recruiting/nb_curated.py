@@ -7,11 +7,10 @@ from pyspark.sql.functions import lit, col
 from datetime import datetime
 
 load_time = datetime.now()
-raw_base_path = dbutils.secrets.get("demo", "raw-datalake-path") + "cu"
 refined_base_path = dbutils.secrets.get("demo", "refined-datalake-path") + "cu"
-raw_format = "parquet"
+curated_base_path = dbutils.secrets.get("demo", "curated-datalake-path") 
 refined_format = "delta"
-
+curated_format = "delta"
 
 adls_authenticate()
 
