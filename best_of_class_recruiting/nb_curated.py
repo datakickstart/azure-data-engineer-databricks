@@ -27,8 +27,9 @@ create_database("refined", refined_base_path)
 
 
 #Area table
+columns = ["area_code", "area_name", "display_level"]
 area_raw_df = spark.read.format(raw_format).load(raw_base_path + "/area")
-area_refined = area_raw_df.select("area_code", "area_name", "display_level")
+area_refined = area_raw_df.select(columns)
 area_refined.write.format(refined_format).save(refined_base_path + "area")
 
 # COMMAND ----------
@@ -47,14 +48,15 @@ series_refined.write.mode("overwrite").format(refined_format).save(refined_base_
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE DATABASE refined_cu;
+# MAGIC CREATE DATABASE curated;
 
 # COMMAND ----------
 
-# Current table
-current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
-current_refined = current_raw_df.select("*").drop("footnote_codes")
-current_refined.write.option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
+# Fact Current CU table
+columns = ["series_id", "year", "period", "value"]
+refined_df = spark.read.table("refined_cu.current")
+curated_df = refined_df.select(columns)
+curated_df.write.option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("curated.fact_current_cu")
 
 # COMMAND ----------
 

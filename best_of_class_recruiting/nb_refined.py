@@ -55,7 +55,7 @@ series_refined.write.mode("overwrite").format(refined_format).save(refined_base_
 # Current table
 current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
 current_refined = current_raw_df.select("*").drop("footnote_codes")
-current_refined.write.option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
+current_refined.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
 
 # COMMAND ----------
 
