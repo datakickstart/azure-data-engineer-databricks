@@ -56,8 +56,11 @@ series_refined.write.mode("overwrite").format(refined_format).save(refined_base_
 columns = ["series_id", "year", "period", "value"]
 refined_df = spark.read.table("refined_cu.current")
 curated_df = refined_df.select(columns)
-curated_df.write.option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("curated.fact_current_cu")
+curated_df.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("curated.fact_current_cu")
 
 # COMMAND ----------
 
-
+# MAGIC %sql
+# MAGIC SELECT count(1) FROM table_changes('curated.fact_current_cu', 2,10) --where _change_type != 'insert' limit 20
+# MAGIC -- 0 - 963989
+# MAGIC -- 1 - 1927978
