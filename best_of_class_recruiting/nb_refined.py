@@ -30,36 +30,35 @@ def create_database(db_name, path, drop=False):
 
 # COMMAND ----------
 
-
-#Area table - SETUP
-area_raw_df = spark.read.format(raw_format).load(raw_base_path + "/area_original")
-area_refined = area_raw_df.select("area_code", "area_name", "display_level").withColumn("is_deleted", lit(False))
-area_refined.write.format(refined_format).mode("overwrite").option("enableChangeDataFeed","true").save(refined_base_path + "/area")
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ### Prep source and target tables
+# MAGIC ### Prep source and target tables (for demo only)
 
 # COMMAND ----------
 
-from delta.tables import *
 
-table = 'area'
-id = 'area_code'
-
-raw_df = spark.read.format(raw_format).load(raw_base_path + "/area")
-df_source = raw_df.select("area_code", "area_name", "display_level").withColumn("is_deleted", lit(False))
-
-delta_target = DeltaTable.forPath(spark, f"{refined_base_path}/{table}")
-df_target = delta_target.toDF()
-
-display(df_source)
+## Area table
+# area_raw_df = spark.read.format(raw_format).load(raw_base_path + "/area_original")
+# area_refined = area_raw_df.select("area_code", "area_name", "display_level").withColumn("is_deleted", lit(False))
+# area_refined.write.format(refined_format).mode("overwrite").option("enableChangeDataFeed","true").save(refined_base_path + "/area")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### Delete if not in source
+## Series table
+# series_raw_df = spark.read.format(raw_format).load(raw_base_path + "/series")
+# series_refined = series_raw_df.drop("footnote_codes").withColumn("lastRefreshed", lit(load_time)
+# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "series")
+
+# COMMAND ----------
+
+## Current table
+# current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
+# current_refined = current_raw_df.select("*").drop("footnote_codes")
+# current_refined.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC ### Delete records (for demo purposes)
 
 # COMMAND ----------
 
@@ -73,43 +72,43 @@ display(df_source)
 
 # COMMAND ----------
 
-t = df_target.filter("is_deleted == False")
-df_source_ids = df_source.select(id)
-df_deleted = t.join(df_source_ids, t[id] == df_source_ids[id], "left_anti").withColumn("is_deleted", lit(True))
-display(df_deleted)
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ### Upsert if any column changed
+# MAGIC ### Load refined tables concurrently
 
 # COMMAND ----------
 
-# Upsert to delta target table
-update_dct = {f"{c}": f"s.{c}" for c in df_target.columns if c != id}
-condition_str = ' or '.join(f"t.{k} != {v}" for k,v in update_dct.items())
-
-df_source = df_source.union(df_deleted)
-
-print(condition_str)
-
-delta_target.alias('t') \
-.merge(df_source.alias('s'), f"t.{id} = s.{id}") \
-.whenMatchedUpdate(condition=f"t.{id} = s.{id} and ({condition_str})", set=update_dct) \
-.whenNotMatchedInsertAll() \
-.execute()
+status = dbutils.notebook.run("nb_refined_table_load", 60, arguments={"table": "area", "id_column": "area_code", "columns": "area_code,area_name,display_level" })
+print(status)
+if status != 'success':
+    raise Exception(f"Failed to lo")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC -- Merge the changes to gold
-# MAGIC -- MERGE INTO goldTable t USING silverTable_latest_version s ON s.Country = t.Country
-# MAGIC --         WHEN MATCHED AND s._change_type='update_postimage' THEN UPDATE SET VaccinationRate = s.NumVaccinated/s.AvailableDoses
-# MAGIC --         WHEN NOT MATCHED THEN INSERT (Country, VaccinationRate) VALUES (s.Country, s.NumVaccinated/s.AvailableDoses)
+from threading import Thread
+from queue import Queue
 
-# COMMAND ----------
+q = Queue()
+
+worker_count = 2
+
+def run_tasks(function, q):
+    while not q.empty():
+        value = q.get()
+        function(value)
+        q.task_done()
 
 
+print(table_list)
+
+for table in table_list:
+    q.put(table)
+
+for i in range(worker_count):
+    t=Thread(target=run_tasks, args=(load_table, q))
+    t.daemon = True
+    t.start()
+
+q.join()
 
 # COMMAND ----------
 
@@ -117,20 +116,6 @@ delta_target.alias('t') \
 refined_df =spark.read.format("delta").option("readChangeData", True).option("startingVersion",1).load(f"{refined_base_path}/{table}")
 display(refined_df.orderBy("area_code"))
 
-
-# COMMAND ----------
-
-# Series table
-# series_raw_df = spark.read.format(raw_format).load(raw_base_path + "/series")
-# series_refined = series_raw_df.drop("footnote_codes").withColumn("lastRefreshed", lit(load_time)
-# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "series")
-
-# COMMAND ----------
-
-# Current table
-# current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
-# current_refined = current_raw_df.select("*").drop("footnote_codes")
-# current_refined.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
 
 # COMMAND ----------
 
