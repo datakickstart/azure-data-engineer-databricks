@@ -45,15 +45,15 @@ def create_database(db_name, path, drop=False):
 
 ## Series table
 # series_raw_df = spark.read.format(raw_format).load(raw_base_path + "/series")
-# series_refined = series_raw_df.drop("footnote_codes").withColumn("lastRefreshed", lit(load_time)
-# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "series")
+# series_refined = series_raw_df.drop("footnote_codes").withColumn("is_deleted", lit(False))
+# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "/series")
 
 # COMMAND ----------
 
 ## Current table
 # current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
 # current_refined = current_raw_df.select("*").drop("footnote_codes")
-# current_refined.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
+# current_refined.write.mode("overwrite").format(refined_format).saveAsTable("refined_cu.current")
 
 # COMMAND ----------
 
@@ -77,10 +77,22 @@ def create_database(db_name, path, drop=False):
 
 # COMMAND ----------
 
-status = dbutils.notebook.run("nb_refined_table_load", 60, arguments={"table": "area", "id_column": "area_code", "columns": "area_code,area_name,display_level" })
-print(status)
-if status != 'success':
-    raise Exception(f"Failed to lo")
+
+def load_table(args):
+    status = dbutils.notebook.run("nb_refined_table_load", 60, arguments=args)
+    print(status)
+    if status != 'success':
+        raise Exception(f"Failed to load refined database. Status: {str(status)}")
+
+# status = dbutils.notebook.run("nb_refined_table_load", 60, arguments={"table": "area", "id_column": "area_code", "columns": "area_code,area_name,display_level" })
+
+table_list = [
+    {"table": "area", "id_column": "area_code", "columns": "area_code,area_name,display_level"},
+    {"table": "series", "id_column": "series_id", 
+     "columns": "series_id,area_code,item_code,seasonal,periodicity_code,base_code,base_period,series_title,begin_year,begin_period,end_year,end_period"},
+    {"table": "current", "id_column": "series_id,year,period", "columns": "series_id,year,period,value"},
+    {"table": "item", "id_column": "item_code", "columns": "item_code,item_name,display_level,sort_sequence"}
+]
 
 # COMMAND ----------
 
@@ -93,15 +105,21 @@ worker_count = 2
 
 def run_tasks(function, q):
     while not q.empty():
-        value = q.get()
-        function(value)
-        q.task_done()
+        try:
+            value = q.get()
+            function(value)
+        except Exception as e:
+            table = value.get("table", "UNKNOWN TABLE")
+            print(f"Error processing table {table}")
+            print(e)
+        finally:
+            q.task_done()
 
 
 print(table_list)
 
-for table in table_list:
-    q.put(table)
+for table_args in table_list:
+    q.put(table_args)
 
 for i in range(worker_count):
     t=Thread(target=run_tasks, args=(load_table, q))
@@ -109,14 +127,3 @@ for i in range(worker_count):
     t.start()
 
 q.join()
-
-# COMMAND ----------
-
-# display(delta_target.history())
-refined_df =spark.read.format("delta").option("readChangeData", True).option("startingVersion",1).load(f"{refined_base_path}/{table}")
-display(refined_df.orderBy("area_code"))
-
-
-# COMMAND ----------
-
-

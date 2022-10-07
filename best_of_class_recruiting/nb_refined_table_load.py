@@ -9,7 +9,7 @@ dbutils.widgets.text("columns","area_code,area_name,display_level")
 
 # COMMAND ----------
 
-from pyspark.sql.functions import lit, col
+from pyspark.sql.functions import lit, col, expr
 from datetime import datetime
 
 load_time = datetime.now()
@@ -41,23 +41,36 @@ adls_authenticate()
 
 # COMMAND ----------
 
+from pyspark.sql.utils import AnalysisException
 from delta.tables import *
 
 table = dbutils.widgets.get("table")
 id = dbutils.widgets.get("id_column")
 columns = dbutils.widgets.get("columns").split(',')
-if id not in columns:
-    columns = [id] + columns
 
 print(columns)
 
 raw_df = spark.read.format(raw_format).load(f"{raw_base_path}/{table}")
 df_source = raw_df.select(*columns).withColumn("is_deleted", lit(False))
 
-delta_target = DeltaTable.forPath(spark, f"{refined_base_path}/{table}")
-df_target = delta_target.toDF()
 
-display(df_source)
+try:
+    delta_target = DeltaTable.forPath(spark, f"{refined_base_path}/{table}")
+    df_target = delta_target.toDF().filter("is_deleted == False")
+except AnalysisException as e:
+    if str(e).find('not a Delta table'):
+        print("Table does not exist, need to create table first.")
+        df_source.write.format("delta").save(f"{refined_base_path}/{table}")
+        dbutils.notebook.exit("success")
+
+# COMMAND ----------
+
+# Build id string
+id_list = id.split(',')
+if ',' in id:
+    id_str = ' and '.join(f"t.{i} = s.{i}" for i in id_list)
+else:
+    id_str = id
 
 # COMMAND ----------
 
@@ -66,9 +79,8 @@ display(df_source)
 
 # COMMAND ----------
 
-t = df_target.filter("is_deleted == False")
-df_source_ids = df_source.select(id)
-df_deleted = t.join(df_source_ids, t[id] == df_source_ids[id], "left_anti").withColumn("is_deleted", lit(True))
+df_source_ids = df_source.select(*id_list)
+df_deleted = df_target.alias('t').join(df_source_ids.alias('s'), expr(id_str), "left_anti").withColumn("is_deleted", lit(True))
 display(df_deleted)
 
 # COMMAND ----------
@@ -79,51 +91,19 @@ display(df_deleted)
 # COMMAND ----------
 
 # Upsert to delta target table
-update_dct = {f"{c}": f"s.{c}" for c in df_target.columns if c != id}
+update_dct = {f"{c}": f"s.{c}" for c in df_target.columns if c not in id}
 condition_str = ' or '.join(f"t.{k} != {v}" for k,v in update_dct.items())
 
 df_source = df_source.union(df_deleted)
 
+print(id_str)
 print(condition_str)
 
 delta_target.alias('t') \
-.merge(df_source.alias('s'), f"t.{id} = s.{id}") \
-.whenMatchedUpdate(condition=f"t.{id} = s.{id} and ({condition_str})", set=update_dct) \
+.merge(df_source.alias('s'), id_str) \
+.whenMatchedUpdate(condition=f"{id_str} and ({condition_str})", set=update_dct) \
 .whenNotMatchedInsertAll() \
 .execute()
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- Merge the changes to gold
-# MAGIC -- MERGE INTO goldTable t USING silverTable_latest_version s ON s.Country = t.Country
-# MAGIC --         WHEN MATCHED AND s._change_type='update_postimage' THEN UPDATE SET VaccinationRate = s.NumVaccinated/s.AvailableDoses
-# MAGIC --         WHEN NOT MATCHED THEN INSERT (Country, VaccinationRate) VALUES (s.Country, s.NumVaccinated/s.AvailableDoses)
-
-# COMMAND ----------
-
-
-
-# COMMAND ----------
-
-# # display(delta_target.history())
-# refined_df =spark.read.format("delta").option("readChangeData", True).option("startingVersion",1).load(f"{refined_base_path}/{table}")
-# display(refined_df.orderBy("area_code"))
-
-
-# COMMAND ----------
-
-# Series table
-# series_raw_df = spark.read.format(raw_format).load(raw_base_path + "/series")
-# series_refined = series_raw_df.drop("footnote_codes").withColumn("lastRefreshed", lit(load_time)
-# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "series")
-
-# COMMAND ----------
-
-# Current table
-# current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
-# current_refined = current_raw_df.select("*").drop("footnote_codes")
-# current_refined.write.mode("overwrite").option("delta.enableChangeDataFeed","true").format(refined_format).saveAsTable("refined_cu.current")
 
 # COMMAND ----------
 
