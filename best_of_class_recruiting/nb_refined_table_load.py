@@ -12,12 +12,12 @@ dbutils.widgets.text("columns","area_code,area_name,display_level")
 from pyspark.sql.functions import lit, col, expr
 from datetime import datetime
 
-load_time = datetime.now()
+# load_time = datetime.now()
 raw_base_path = dbutils.secrets.get("demo", "raw-datalake-path") + "cu"
 refined_base_path = dbutils.secrets.get("demo", "refined-datalake-path") + "cu"
 raw_format = "parquet"
 refined_format = "delta"
-
+refined_db = "refined"
  
 adls_authenticate()
 
@@ -55,12 +55,12 @@ df_source = raw_df.select(*columns).withColumn("is_deleted", lit(False))
 
 
 try:
-    delta_target = DeltaTable.forPath(spark, f"{refined_base_path}/{table}")
+    delta_target = DeltaTable.forName(spark, f"{refined_db}.{table}")
     df_target = delta_target.toDF().filter("is_deleted == False")
 except AnalysisException as e:
     if str(e).find('not a Delta table'):
         print("Table does not exist, need to create table first.")
-        df_source.write.format("delta").save(f"{refined_base_path}/{table}")
+        df_source.write.format("delta").saveAsTable(f"{refined_db}.{table}")
         dbutils.notebook.exit("success")
 
 # COMMAND ----------

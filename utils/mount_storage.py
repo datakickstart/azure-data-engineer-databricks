@@ -52,9 +52,9 @@ def adls_mount(account_name="dlpssa4dev04", container="raw", mnt_pnt="/mnt/datal
 # COMMAND ----------
 
 def default_mounts():
-    adls_mount(account_name="datakickstartadls", container="raw", mnt_pnt="/mnt/datalake/raw")
-    adls_mount(account_name="datakickstartadls", container="refined", mnt_pnt="/mnt/datalake/refined")    
-    adls_mount(account_name="datakickstartadls", container="curated", mnt_pnt="/mnt/datalake/curated")
+    adls_mount(account_name="dlpssa4dev04", container="raw", mnt_pnt="/mnt/dlpssa/raw")
+    adls_mount(account_name="dlpssa4dev04", container="refined", mnt_pnt="/mnt/dlpssa/refined")    
+    adls_mount(account_name="dlpssa4dev04", container="curated", mnt_pnt="/mnt/dlpssa/curated")
 
 # COMMAND ----------
 

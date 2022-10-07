@@ -8,7 +8,7 @@ from datetime import datetime
 
 load_time = datetime.now()
 raw_base_path = dbutils.secrets.get("demo", "raw-datalake-path") + "cu"
-refined_base_path = dbutils.secrets.get("demo", "refined-datalake-path") + "cu"
+refined_base_path = "/mnt/dlpssa/refined" #dbutils.secrets.get("demo", "refined-datalake-path") + "cu"
 raw_format = "parquet"
 refined_format = "delta"
 
@@ -16,10 +16,10 @@ adls_authenticate()
 
 # COMMAND ----------
 
-def create_database(db_name, path, drop=False):
-    if drop:
-        spark.sql(f"DROP DATABASE IF EXISTS {db_name} CASCADE;")    
-    spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name} LOCATION '{path}'")
+# def create_database(db_name, path, drop=False):
+#     if drop:
+#         spark.sql(f"DROP DATABASE IF EXISTS {db_name} CASCADE;")    
+#     spark.sql(f"CREATE DATABASE IF NOT EXISTS {db_name} LOCATION '{path}'")
 
 # create_database("refined", refined_base_path)
 
@@ -27,33 +27,6 @@ def create_database(db_name, path, drop=False):
 
 # MAGIC %sql
 # MAGIC SET spark.databricks.delta.properties.defaults.enableChangeDataFeed = true
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Prep source and target tables (for demo only)
-
-# COMMAND ----------
-
-
-## Area table
-# area_raw_df = spark.read.format(raw_format).load(raw_base_path + "/area_original")
-# area_refined = area_raw_df.select("area_code", "area_name", "display_level").withColumn("is_deleted", lit(False))
-# area_refined.write.format(refined_format).mode("overwrite").option("enableChangeDataFeed","true").save(refined_base_path + "/area")
-
-# COMMAND ----------
-
-## Series table
-# series_raw_df = spark.read.format(raw_format).load(raw_base_path + "/series")
-# series_refined = series_raw_df.drop("footnote_codes").withColumn("is_deleted", lit(False))
-# series_refined.write.mode("overwrite").format(refined_format).save(refined_base_path + "/series")
-
-# COMMAND ----------
-
-## Current table
-# current_raw_df = spark.read.format(raw_format).load(raw_base_path + "/current")
-# current_refined = current_raw_df.select("*").drop("footnote_codes")
-# current_refined.write.mode("overwrite").format(refined_format).saveAsTable("refined_cu.current")
 
 # COMMAND ----------
 
@@ -111,7 +84,7 @@ def run_tasks(function, q):
         except Exception as e:
             table = value.get("table", "UNKNOWN TABLE")
             print(f"Error processing table {table}")
-            print(e)
+            raise e
         finally:
             q.task_done()
 

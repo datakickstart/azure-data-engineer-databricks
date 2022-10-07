@@ -91,6 +91,12 @@ display(base_df)
 
 # COMMAND ----------
 
+# Evaluate and explore period
+period_df = spark.read.format("parquet").load(raw_storage_base_path + "cu/period")
+display(period_df)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Current
 # MAGIC 1. Business key = series_id, year, period
